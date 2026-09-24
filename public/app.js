@@ -1,4 +1,5 @@
-const $=s=>document.querySelector(s); 
+alert("JAVASCRIPT LÄUFT");
+const $=s=>document.querySelector(s);
 
 async function api(url,opt={}){
   try{
