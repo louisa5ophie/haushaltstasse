@@ -1,4 +1,3 @@
-alert("JAVASCRIPT LÄUFT");
 const $=s=>document.querySelector(s);
 
 async function api(url,opt={}){
@@ -45,6 +44,7 @@ function login(){
         <div class="eyebrow">HAUSHALTSTASSE</div>
         <h1>Anmelden</h1>
         <p class="muted">Nur Louisa und Patrick haben Zugang.</p>
+
         <form id="lf">
           <div class="field">
             <label>Benutzer</label>
@@ -53,10 +53,12 @@ function login(){
               <option value="patrick">Patrick</option>
             </select>
           </div>
+
           <div class="field">
             <label>Passwort</label>
             <input id="p" type="password" autocomplete="current-password" required>
           </div>
+
           <button class="drawbtn">Anmelden</button>
           <p id="err" class="overdue"></p>
         </form>
@@ -77,13 +79,35 @@ function login(){
 
       let m=await api("/api/me");
 
-      $("#err").textContent=
-        "Login erfolgreich. Sitzung: "+JSON.stringify(m);
+      if(!m?.user){
+        throw Error("Login erfolgreich, aber keine Sitzung gefunden.");
+      }
+
+      STATE.me=m.user;
+
+      let s=await api("/api/state");
+
+      STATE.assignments=Object.fromEntries(
+        s.assignments.map(x=>[
+          x.task_id+"@"+x.period,
+          x.assigned_to
+        ])
+      );
+
+      STATE.completions=Object.fromEntries(
+        s.completions.map(x=>[
+          x.task_id+"@"+x.period,
+          x.completed_at
+        ])
+      );
+
+      render();
 
     }catch(x){
-      $("#err").textContent=x.message
+      $("#err").textContent=x.message;
     }
   }
+}
 }
 
 function t(id){
