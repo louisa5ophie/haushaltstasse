@@ -1,0 +1,519 @@
+{
+  "tasks": [
+    {
+      "id": 1,
+      "name": "Badezimmer reinigen",
+      "frequency": "weekly",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 2,
+      "name": "Gästebad reinigen",
+      "frequency": "weekly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 3,
+      "name": "Staubsaugen",
+      "frequency": "weekly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 4,
+      "name": "Staubwischen",
+      "frequency": "weekly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 5,
+      "name": "Küchenspüle reinigen",
+      "frequency": "weekly",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 6,
+      "name": "Dusche im Badezimmer reinigen",
+      "frequency": "biweekly",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 7,
+      "name": "Dusche im Gästebad reinigen",
+      "frequency": "biweekly",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 8,
+      "name": "Küchenfronten gründlich reinigen",
+      "frequency": "bimonthly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 9,
+      "name": "Haustür innen und außen reinigen + Briefkasten reinigen",
+      "frequency": "bimonthly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 10,
+      "name": "Treppe gründlich reinigen",
+      "frequency": "bimonthly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 11,
+      "name": "Staubsauger gründlich reinigen",
+      "frequency": "bimonthly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 12,
+      "name": "Wischen",
+      "frequency": "bimonthly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 13,
+      "name": "Geschirrspüler gründlich reinigen",
+      "frequency": "quarterly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 14,
+      "name": "Waschmaschine gründlich reinigen",
+      "frequency": "quarterly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 15,
+      "name": "Dunstabzugshaube reinigen",
+      "frequency": "quarterly",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 16,
+      "name": "Matratzen wenden + Betten neu beziehen + unter dem Bett gründlich reinigen",
+      "frequency": "quarterly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 17,
+      "name": "Fußleisten gründlich reinigen",
+      "frequency": "quarterly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 18,
+      "name": "Mülleimer gründlich reinigen",
+      "frequency": "quarterly",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 19,
+      "name": "Fenster innen reinigen (Handabdrücke)",
+      "frequency": "quarterly",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 20,
+      "name": "Backofen gründlich reinigen",
+      "frequency": "semiannual",
+      "points": 5,
+      "shared": false
+    },
+    {
+      "id": 21,
+      "name": "Kühlschrank komplett ausräumen und reinigen",
+      "frequency": "semiannual",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 22,
+      "name": "Kaffeemaschine entkalken und reinigen",
+      "frequency": "semiannual",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 23,
+      "name": "Bilderrahmen reinigen",
+      "frequency": "semiannual",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 24,
+      "name": "Lüftungsfilter durchpusten",
+      "frequency": "semiannual",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 25,
+      "name": "Wasserfilter spülen",
+      "frequency": "semiannual",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 26,
+      "name": "Kindersitze aussaugen",
+      "frequency": "semiannual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 27,
+      "name": "Fenster putzen",
+      "frequency": "semiannual",
+      "points": 5,
+      "shared": true
+    },
+    {
+      "id": 28,
+      "name": "Türen abwischen",
+      "frequency": "semiannual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 29,
+      "name": "Lichtschalter abwischen",
+      "frequency": "semiannual",
+      "points": 1,
+      "shared": false
+    },
+    {
+      "id": 30,
+      "name": "Spielsachen aussortieren",
+      "frequency": "semiannual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 31,
+      "name": "Mikrowelle gründlich reinigen",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 32,
+      "name": "Medikamente und Verbandsmaterial kontrollieren",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 33,
+      "name": "Gefrierschrank abtauen und reinigen",
+      "frequency": "annual",
+      "points": 5,
+      "shared": false
+    },
+    {
+      "id": 34,
+      "name": "Vorratsschrank kontrollieren und aussortieren",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 35,
+      "name": "Gewürze kontrollieren und aussortieren",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 36,
+      "name": "Küchenschubladen ausräumen und auswischen",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 37,
+      "name": "Küchenschränke innen auswischen",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 38,
+      "name": "Auto aussaugen",
+      "frequency": "annual",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 39,
+      "name": "Sockelleisten unter den Küchenschränken reinigen",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 40,
+      "name": "Kleiderschrank – Kleidung aussortieren",
+      "frequency": "annual",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 41,
+      "name": "Schuhe aussortieren",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 42,
+      "name": "Jacken und Mäntel aussortieren",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 43,
+      "name": "HWR-Schränke aussortieren",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 44,
+      "name": "Papier-, Büro- und Unterlagen sortieren",
+      "frequency": "annual",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 45,
+      "name": "Technik- und Kabelschublade sortieren",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 46,
+      "name": "Sofa gründlich reinigen",
+      "frequency": "annual",
+      "points": 4,
+      "shared": false
+    },
+    {
+      "id": 47,
+      "name": "Vorhänge/Gardinen waschen",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 48,
+      "name": "Lampen und Lampenschirme reinigen",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 49,
+      "name": "Pflanzen gründlich pflegen",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 50,
+      "name": "Badezimmerschrank komplett ausräumen und auswischen",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 51,
+      "name": "Kosmetik aussortieren",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 52,
+      "name": "Abflüsse vorbeugend reinigen",
+      "frequency": "annual",
+      "points": 3,
+      "shared": false
+    },
+    {
+      "id": 53,
+      "name": "Spinnweben im ganzen Haus entfernen",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 54,
+      "name": "Rauchmelder äußerlich reinigen + Funktion prüfen + Lüftungsgitter reinigen",
+      "frequency": "annual",
+      "points": 2,
+      "shared": false
+    },
+    {
+      "id": 55,
+      "name": "Dachboden aufräumen",
+      "frequency": "annual",
+      "points": 5,
+      "shared": true
+    }
+  ],
+  "months": {
+    "2026-10": [
+      8,
+      9,
+      17,
+      24,
+      29,
+      47,
+      52,
+      55
+    ],
+    "2026-11": [
+      10,
+      11,
+      12,
+      14,
+      15,
+      18,
+      20,
+      32,
+      41,
+      53
+    ],
+    "2026-12": [
+      8,
+      9,
+      13,
+      19,
+      22,
+      25,
+      28,
+      54,
+      36,
+      44
+    ],
+    "2027-01": [
+      10,
+      11,
+      12,
+      17,
+      26,
+      33,
+      38
+    ],
+    "2027-02": [
+      8,
+      9,
+      14,
+      15,
+      16,
+      18,
+      30,
+      48
+    ],
+    "2027-03": [
+      10,
+      11,
+      12,
+      13,
+      19,
+      22,
+      37,
+      35
+    ],
+    "2027-04": [
+      8,
+      9,
+      17,
+      21,
+      24,
+      29,
+      27,
+      41,
+      34
+    ],
+    "2027-05": [
+      10,
+      11,
+      12,
+      14,
+      15,
+      18,
+      20,
+      36,
+      39
+    ],
+    "2027-06": [
+      8,
+      9,
+      13,
+      19,
+      23,
+      25,
+      28,
+      21,
+      45
+    ],
+    "2027-07": [
+      10,
+      11,
+      12,
+      17,
+      26,
+      33,
+      34,
+      46
+    ],
+    "2027-08": [
+      8,
+      9,
+      14,
+      15,
+      18,
+      30,
+      27,
+      51
+    ],
+    "2027-09": [
+      10,
+      11,
+      12,
+      13,
+      19,
+      22,
+      43,
+      49,
+      53
+    ]
+  },
+  "version": "0.1"
+}
