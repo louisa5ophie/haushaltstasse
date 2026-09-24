@@ -255,7 +255,7 @@ function render(){
       <div>
 
         <div class="eyebrow">
-          HAUSHALTS TASSE
+          HAUSHALTSTASSE
         </div>
 
         <h1>
@@ -287,10 +287,10 @@ function render(){
 
       ${
         [
-          ["week","⌂","Diese Woche"],
-          ["cup","♨","Monats-Tasse"],
-          ["tasks","✓","Aufgaben"],
-          ["history","◷","Historie"]
+          ["week","🗓️","Diese Woche"],
+          ["cup","☕️","Monats-Tasse"],
+          ["tasks","☑️","Aufgaben"],
+          ["history","🎍","Historie"]
         ]
         .map(a=>`
 
@@ -331,11 +331,11 @@ function week(){
       </div>
 
       <h2>
-        Gemeinsam statt Nachhalten.
+        Unser Haushaltsplan.✨
       </h2>
 
       <div class="muted">
-        55 Aufgaben · Aufwand statt Stückzahl
+        Sperberweg 7
       </div>
 
     </div>
