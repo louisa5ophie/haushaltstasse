@@ -1,4 +1,4 @@
-const $=s=>document.querySelector(s);
+const $=s=>document.querySelector(s); 
 
 async function api(url,opt={}){
   try{
@@ -31,8 +31,18 @@ async function boot(){
   if(m?.user){
     STATE.me=m.user;
     let s=await api("/api/state");
-    STATE.assignments=Object.fromEntries(s.assignments.map(x=>[x.task_id+"@"+x.period,x.assigned_to]));
-    STATE.completions=Object.fromEntries(s.completions.map(x=>[x.task_id+"@"+x.period,x.completed_at]));
+    STATE.assignments=Object.fromEntries(
+      s.assignments.map(x=>[
+        x.task_id+"@"+x.period,
+        x.assigned_to
+      ])
+    );
+    STATE.completions=Object.fromEntries(
+      s.completions.map(x=>[
+        x.task_id+"@"+x.period,
+        x.completed_at
+      ])
+    );
     render()
   }
 }
@@ -107,7 +117,6 @@ function login(){
       $("#err").textContent=x.message;
     }
   }
-}
 }
 
 function t(id){
