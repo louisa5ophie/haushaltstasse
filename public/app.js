@@ -1,4 +1,10 @@
-const $=s=>document.querySelector(s); 
+let DATA={tasks:[],months:{}};
+let STATE={me:null,assignments:{},completions:{}};
+let tab="week";
+let filter="all";
+let month="2026-10";
+
+const $=s=>document.querySelector(s);
 
 async function api(url,opt={}){
   try{
@@ -9,40 +15,63 @@ async function api(url,opt={}){
         ...(opt.headers||{})
       }
     });
+
     let text=await r.text();
     let j;
+
     try{
       j=JSON.parse(text)
     }catch(e){
-      throw Error("Serverantwort ist kein gültiges JSON ("+r.status+"): "+text.slice(0,120))
+      throw Error(
+        "Serverantwort ist kein gültiges JSON ("+
+        r.status+"): "+
+        text.slice(0,120)
+      )
     }
-    if(r.status===401)throw Error("Login abgelehnt (HTTP 401).");
-    if(!r.ok)throw Error(j.error||"HTTP "+r.status);
+
+    if(r.status===401){
+      throw Error("Login abgelehnt (HTTP 401).")
+    }
+
+    if(!r.ok){
+      throw Error(j.error||"HTTP "+r.status)
+    }
+
     return j
+
   }catch(e){
     console.error("API-Fehler:",url,e);
-    throw Error("API-Fehler: "+(e?.message||String(e)))
+    throw Error(
+      "API-Fehler: "+
+      (e?.message||String(e))
+    )
   }
 }
 
 async function boot(){
   DATA=await (await fetch("/data.json")).json();
+
   let m=await api("/api/me");
+
   if(m?.user){
     STATE.me=m.user;
+
     let s=await api("/api/state");
+
     STATE.assignments=Object.fromEntries(
       s.assignments.map(x=>[
         x.task_id+"@"+x.period,
         x.assigned_to
       ])
     );
+
     STATE.completions=Object.fromEntries(
       s.completions.map(x=>[
         x.task_id+"@"+x.period,
         x.completed_at
       ])
     );
+
     render()
   }
 }
@@ -52,12 +81,18 @@ function login(){
     <main style="max-width:420px;margin:12vh auto;padding:20px">
       <div class="card">
         <div class="eyebrow">HAUSHALTSTASSE</div>
+
         <h1>Anmelden</h1>
-        <p class="muted">Nur Louisa und Patrick haben Zugang.</p>
+
+        <p class="muted">
+          Nur Louisa und Patrick haben Zugang.
+        </p>
 
         <form id="lf">
+
           <div class="field">
             <label>Benutzer</label>
+
             <select id="u">
               <option value="louisa">Louisa</option>
               <option value="patrick">Patrick</option>
@@ -66,11 +101,21 @@ function login(){
 
           <div class="field">
             <label>Passwort</label>
-            <input id="p" type="password" autocomplete="current-password" required>
+
+            <input
+              id="p"
+              type="password"
+              autocomplete="current-password"
+              required
+            >
           </div>
 
-          <button class="drawbtn">Anmelden</button>
+          <button class="drawbtn">
+            Anmelden
+          </button>
+
           <p id="err" class="overdue"></p>
+
         </form>
       </div>
     </main>`;
@@ -79,6 +124,7 @@ function login(){
     e.preventDefault();
 
     try{
+
       await api("/api/login",{
         method:"POST",
         body:JSON.stringify({
@@ -90,7 +136,9 @@ function login(){
       let m=await api("/api/me");
 
       if(!m?.user){
-        throw Error("Login erfolgreich, aber keine Sitzung gefunden.");
+        throw Error(
+          "Login erfolgreich, aber keine Sitzung gefunden."
+        );
       }
 
       STATE.me=m.user;
@@ -125,10 +173,16 @@ function t(id){
 
 function ml(k){
   let[y,m]=k.split("-").map(Number);
-  return new Intl.DateTimeFormat("de-DE",{
-    month:"long",
-    year:"numeric"
-  }).format(new Date(y,m-1,1))
+
+  return new Intl.DateTimeFormat(
+    "de-DE",
+    {
+      month:"long",
+      year:"numeric"
+    }
+  ).format(
+    new Date(y,m-1,1)
+  )
 }
 
 function al(id,p){
@@ -140,6 +194,7 @@ function done(id,p){
 }
 
 async function complete(id,p){
+
   await api("/api/complete",{
     method:"POST",
     body:JSON.stringify({
@@ -161,44 +216,75 @@ async function complete(id,p){
 }
 
 function row(x,p){
+
   return `
     <div class="taskrow">
-      <button class="check ${done(x.id,p)?"done":""}" onclick="complete(${x.id},'${p}')">
+
+      <button
+        class="check ${done(x.id,p)?"done":""}"
+        onclick="complete(${x.id},'${p}')"
+      >
         ${done(x.id,p)?"✓":""}
       </button>
+
       <div class="taskname ${done(x.id,p)?"completed":""}">
+
         ${x.name}
+
         <div class="meta">
           ${al(x.id,p)?al(x.id,p)+" · ":""}
           ${x.points} Punkte
           ${x.shared?" · gemeinsam":""}
         </div>
+
       </div>
-      <span class="points">${x.points} P</span>
+
+      <span class="points">
+        ${x.points} P
+      </span>
+
     </div>`
 }
 
 function render(){
+
   document.body.innerHTML=`
+
     <header class="topbar">
+
       <div>
-        <div class="eyebrow">HAUSHALTS TASSE</div>
+
+        <div class="eyebrow">
+          HAUSHALTS TASSE
+        </div>
+
         <h1>
-          ${tab==="week"
+          ${
+            tab==="week"
             ?"Diese Woche"
             :tab==="cup"
             ?"Monats-Tasse"
             :tab==="tasks"
             ?"Aufgaben"
-            :"Historie"}
+            :"Historie"
+          }
         </h1>
+
       </div>
-      <button class="iconbtn" onclick="logout()">↪</button>
+
+      <button
+        class="iconbtn"
+        onclick="logout()"
+      >
+        ↪
+      </button>
+
     </header>
 
     <main id="c"></main>
 
     <nav class="tabbar">
+
       ${
         [
           ["week","⌂","Diese Woche"],
@@ -207,12 +293,19 @@ function render(){
           ["history","◷","Historie"]
         ]
         .map(a=>`
-          <button class="tab ${tab===a[0]?"active":""}" onclick="tab='${a[0]}';render()">
-            ${a[1]}<span>${a[2]}</span>
+
+          <button
+            class="tab ${tab===a[0]?"active":""}"
+            onclick="tab='${a[0]}';render()"
+          >
+            ${a[1]}
+            <span>${a[2]}</span>
           </button>
+
         `)
         .join("")
       }
+
     </nav>`;
 
   ({
@@ -224,90 +317,182 @@ function render(){
 }
 
 function week(){
-  let ids=DATA.tasks.filter(x=>["weekly","biweekly"].includes(x.frequency));
+
+  let ids=DATA.tasks.filter(
+    x=>["weekly","biweekly"].includes(x.frequency)
+  );
 
   $("#c").innerHTML=`
+
     <div class="hero">
-      <div class="muted">Angemeldet als ${STATE.me.displayName}</div>
-      <h2>Gemeinsam statt Nachhalten.</h2>
-      <div class="muted">55 Aufgaben · Aufwand statt Stückzahl</div>
+
+      <div class="muted">
+        Angemeldet als ${STATE.me.displayName}
+      </div>
+
+      <h2>
+        Gemeinsam statt Nachhalten.
+      </h2>
+
+      <div class="muted">
+        55 Aufgaben · Aufwand statt Stückzahl
+      </div>
+
     </div>
 
-    <div class="sectiontitle">Regelmäßige Aufgaben</div>
+    <div class="sectiontitle">
+      Regelmäßige Aufgaben
+    </div>
 
     <div class="card">
+
       ${ids.map(x=>row(x,month)).join("")}
+
     </div>`
 }
 
 function cup(){
+
   let ids=DATA.months[month]||[];
-  let rem=ids.filter(id=>!al(id,month));
-  let drawn=ids.filter(id=>al(id,month));
+
+  let rem=ids.filter(
+    id=>!al(id,month)
+  );
+
+  let drawn=ids.filter(
+    id=>al(id,month)
+  );
 
   let person=
-    drawn.filter(id=>!t(id).shared).length%2===0
+    drawn.filter(
+      id=>!t(id).shared
+    ).length%2===0
       ?"Louisa"
       :"Patrick";
 
   $("#c").innerHTML=`
+
     <div class="card">
+
       <div class="monthnav">
-        <button onclick="shift(-1)">‹</button>
+
+        <button onclick="shift(-1)">
+          ‹
+        </button>
+
         <div>
-          <b>${ml(month)}</b>
-          <div class="muted">${ids.length} Aufgaben · ${rem.length} offen</div>
+
+          <b>
+            ${ml(month)}
+          </b>
+
+          <div class="muted">
+            ${ids.length} Aufgaben ·
+            ${rem.length} offen
+          </div>
+
         </div>
-        <button onclick="shift(1)">›</button>
+
+        <button onclick="shift(1)">
+          ›
+        </button>
+
       </div>
 
       <div class="cup">
-        <div class="steam">∿ ∿</div>
+
+        <div class="steam">
+          ∿ ∿
+        </div>
+
         <div class="cupshape"></div>
+
       </div>
 
-      <button class="drawbtn" onclick="draw()" ${rem.length?"":"disabled"}>
-        ${rem.length?person+" zieht":"Tasse ist leer"}
+      <button
+        class="drawbtn"
+        onclick="draw()"
+        ${rem.length?"":"disabled"}
+      >
+        ${
+          rem.length
+          ?person+" zieht"
+          :"Tasse ist leer"
+        }
       </button>
+
     </div>
 
     ${
       drawn.length
       ?`
-        <div class="sectiontitle">Gezogen</div>
+
+        <div class="sectiontitle">
+          Gezogen
+        </div>
+
         <div class="card">
+
           ${
             drawn.map(id=>`
+
               <div class="drawn">
-                <strong>${t(id).name}</strong>
+
+                <strong>
+                  ${t(id).name}
+                </strong>
+
                 <div class="meta">
-                  ${al(id,month)} · ${t(id).points} Punkte
+                  ${al(id,month)} ·
+                  ${t(id).points} Punkte
                 </div>
+
               </div>
+
             `).join("")
           }
-        </div>`
+
+        </div>
+
+      `
       :""
     }
 
-    <div class="sectiontitle">Noch in der Tasse</div>
+    <div class="sectiontitle">
+      Noch in der Tasse
+    </div>
 
     <div class="card">
+
       ${
         rem.map(id=>`
+
           <div class="taskrow">
+
             <div class="taskname">
+
               ${t(id).name}
-              <div class="meta">${t(id).points} Punkte</div>
+
+              <div class="meta">
+                ${t(id).points} Punkte
+              </div>
+
             </div>
+
           </div>
+
         `).join("")
       }
+
     </div>`
 }
 
 function shift(d){
-  let[y,m]=month.split("-").map(Number);
+
+  let[y,m]=month
+    .split("-")
+    .map(Number);
+
   m+=d;
 
   if(m<1){
@@ -320,25 +505,43 @@ function shift(d){
     y++
   }
 
-  month=`${y}-${String(m).padStart(2,"0")}`;
+  month=
+    `${y}-${String(m).padStart(2,"0")}`;
+
   render()
 }
 
 async function draw(){
-  let ids=(DATA.months[month]||[]).filter(id=>!al(id,month));
+
+  let ids=
+    (DATA.months[month]||[])
+    .filter(
+      id=>!al(id,month)
+    );
 
   if(!ids.length)return;
 
-  let n=ids[Math.floor(Math.random()*ids.length)];
+  let n=
+    ids[
+      Math.floor(
+        Math.random()*ids.length
+      )
+    ];
+
   let x=t(n);
 
   let drawn=
-    (DATA.months[month]||[]).filter(id=>al(id,month)).length;
+    (DATA.months[month]||[])
+    .filter(
+      id=>al(id,month)
+    ).length;
 
   let person=
     x.shared
       ?"shared"
-      :(drawn%2===0?"Louisa":"Patrick");
+      :(drawn%2===0
+        ?"Louisa"
+        :"Patrick");
 
   await api("/api/assign",{
     method:"POST",
@@ -351,85 +554,161 @@ async function draw(){
 
   let s=await api("/api/state");
 
-  STATE.assignments=Object.fromEntries(
-    s.assignments.map(x=>[
-      x.task_id+"@"+x.period,
-      x.assigned_to
-    ])
-  );
+  STATE.assignments=
+    Object.fromEntries(
+      s.assignments.map(x=>[
+        x.task_id+"@"+x.period,
+        x.assigned_to
+      ])
+    );
 
   render()
 }
 
 function tasks(){
+
   $("#c").innerHTML=`
+
     <div class="pillrow">
+
       ${
-        ["all","weekly","biweekly","bimonthly","quarterly","semiannual","annual"]
+        [
+          "all",
+          "weekly",
+          "biweekly",
+          "bimonthly",
+          "quarterly",
+          "semiannual",
+          "annual"
+        ]
         .map(f=>`
-          <button class="pill ${filter===f?"active":""}" onclick="filter='${f}';render()">
+
+          <button
+            class="pill ${filter===f?"active":""}"
+            onclick="filter='${f}';render()"
+          >
             ${f==="all"?"Alle":f}
           </button>
-        `).join("")
+
+        `)
+        .join("")
       }
+
     </div>
 
     <div class="card">
+
       ${
         DATA.tasks
-        .filter(x=>filter==="all"||x.frequency===filter)
+        .filter(
+          x=>filter==="all"||
+             x.frequency===filter
+        )
         .map(x=>`
+
           <div class="taskrow">
+
             <div class="taskname">
+
               ${x.name}
+
               <div class="meta">
-                ${x.points} Aufwandspunkte ${x.shared?"· gemeinsam":""}
+                ${x.points} Aufwandspunkte
+                ${x.shared?" · gemeinsam":""}
               </div>
+
             </div>
-            <span class="points">${x.points} P</span>
+
+            <span class="points">
+              ${x.points} P
+            </span>
+
           </div>
-        `).join("")
+
+        `)
+        .join("")
       }
+
     </div>`
 }
 
 async function history(){
+
   let s=await api("/api/state");
 
-  let rows=s.completions
+  let rows=
+    s.completions
     .slice()
     .reverse()
     .map(x=>`
+
       <div class="taskrow">
+
         <div class="taskname">
+
           ✓ ${t(x.task_id).name}
+
           <div class="meta">
-            ${x.completed_by} · ${new Date(x.completed_at).toLocaleDateString("de-DE")}
+            ${x.completed_by} ·
+            ${new Date(
+              x.completed_at
+            ).toLocaleDateString("de-DE")}
           </div>
+
         </div>
+
         <span class="points">
-          ${t(x.task_id).shared?"—":t(x.task_id).points+" P"}
+          ${
+            t(x.task_id).shared
+            ?"—"
+            :t(x.task_id).points+" P"
+          }
         </span>
+
       </div>
-    `).join("");
+
+    `)
+    .join("");
 
   $("#c").innerHTML=`
+
     <div class="hero">
-      <div class="muted">Fairness</div>
-      <h2>Historie</h2>
+
       <div class="muted">
-        Gemeinsame Aufgaben werden nicht doppelt gezählt.
+        Fairness
       </div>
+
+      <h2>
+        Historie
+      </h2>
+
+      <div class="muted">
+        Gemeinsame Aufgaben werden
+        nicht doppelt gezählt.
+      </div>
+
     </div>
 
     <div class="card">
-      ${rows||'<div class="empty">Noch keine erledigten Aufgaben.</div>'}
+
+      ${
+        rows ||
+        '<div class="empty">Noch keine erledigten Aufgaben.</div>'
+      }
+
     </div>`
 }
 
 async function logout(){
-  await api("/api/logout",{method:"POST"});
+
+  await api(
+    "/api/logout",
+    {method:"POST"}
+  );
+
   location.reload()
 }
 
-boot().catch(()=>login())
+boot().catch(()=>{
+  login()
+})
