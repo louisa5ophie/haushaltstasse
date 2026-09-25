@@ -1,5 +1,15 @@
-let DATA={tasks:[],months:{}};
-let STATE={me:null,assignments:{},completions:{}};
+let DATA={
+  tasks:[],
+  months:{}
+};
+
+let STATE={
+  me:null,
+  assignments:{},
+  completions:{},
+  periods:{}
+};
+
 let tab="week";
 let filter="all";
 let month="2026-10";
@@ -7,82 +17,122 @@ let month="2026-10";
 const $=s=>document.querySelector(s);
 
 async function api(url,opt={}){
-  try{
-    let r=await fetch(url,{
-      ...opt,
-      headers:{
-        "Content-Type":"application/json",
-        ...(opt.headers||{})
-      }
-    });
 
-    let text=await r.text();
+  try{
+
+    const r=await fetch(
+      url,
+      {
+        ...opt,
+        headers:{
+          "Content-Type":"application/json",
+          ...(opt.headers||{})
+        }
+      }
+    );
+
+    const text=await r.text();
+
     let j;
 
     try{
-      j=JSON.parse(text)
+      j=JSON.parse(text);
     }catch(e){
       throw Error(
         "Serverantwort ist kein gültiges JSON ("+
         r.status+"): "+
         text.slice(0,120)
-      )
+      );
     }
 
     if(r.status===401){
-      throw Error("Login abgelehnt (HTTP 401).")
+      throw Error(
+        "Login abgelehnt (HTTP 401)."
+      );
     }
 
     if(!r.ok){
-      throw Error(j.error||"HTTP "+r.status)
+      throw Error(
+        j.error||"HTTP "+r.status
+      );
     }
 
-    return j
+    return j;
 
   }catch(e){
-    console.error("API-Fehler:",url,e);
+
+    console.error(
+      "API-Fehler:",
+      url,
+      e
+    );
+
     throw Error(
       "API-Fehler: "+
       (e?.message||String(e))
-    )
+    );
   }
 }
 
-async function boot(){
-  DATA=await (await fetch("/data.json")).json();
+async function loadState(){
 
-  let m=await api("/api/me");
+  const s=await api("/api/state");
 
-  if(m?.user){
-    STATE.me=m.user;
-
-    let s=await api("/api/state");
-
-    STATE.assignments=Object.fromEntries(
+  STATE.assignments=
+    Object.fromEntries(
       s.assignments.map(x=>[
         x.task_id+"@"+x.period,
         x.assigned_to
       ])
     );
 
-    STATE.completions=Object.fromEntries(
+  STATE.completions=
+    Object.fromEntries(
       s.completions.map(x=>[
         x.task_id+"@"+x.period,
         x.completed_at
       ])
     );
 
-    render()
+  STATE.periods=s.periods||{};
+}
+
+async function boot(){
+
+  DATA=
+    await(
+      await fetch("/data.json")
+    ).json();
+
+  const m=await api("/api/me");
+
+  if(m?.user){
+
+    STATE.me=m.user;
+
+    await loadState();
+
+    render();
   }
 }
 
 function login(){
-  document.body.innerHTML=`
-    <main style="max-width:420px;margin:12vh auto;padding:20px">
-      <div class="card">
-        <div class="eyebrow">HAUSHALTSTASSE</div>
 
-        <h1>Anmelden</h1>
+  document.body.innerHTML=`
+
+    <main
+      style="max-width:420px;margin:12vh auto;padding:20px"
+    >
+
+      <div class="card">
+
+        <div class="eyebrow">
+          HAUSHALTSTASSE
+        </div>
+
+        <h1>
+          Anmelden
+        </h1>
 
         <p class="muted">
           Nur Louisa und Patrick haben Zugang.
@@ -91,16 +141,30 @@ function login(){
         <form id="lf">
 
           <div class="field">
-            <label>Benutzer</label>
+
+            <label>
+              Benutzer
+            </label>
 
             <select id="u">
-              <option value="louisa">Louisa</option>
-              <option value="patrick">Patrick</option>
+
+              <option value="louisa">
+                Louisa
+              </option>
+
+              <option value="patrick">
+                Patrick
+              </option>
+
             </select>
+
           </div>
 
           <div class="field">
-            <label>Passwort</label>
+
+            <label>
+              Passwort
+            </label>
 
             <input
               id="p"
@@ -108,34 +172,47 @@ function login(){
               autocomplete="current-password"
               required
             >
+
           </div>
 
           <button class="drawbtn">
             Anmelden
           </button>
 
-          <p id="err" class="overdue"></p>
+          <p
+            id="err"
+            class="overdue"
+          ></p>
 
         </form>
+
       </div>
+
     </main>`;
 
   $("#lf").onsubmit=async e=>{
+
     e.preventDefault();
 
     try{
 
-      await api("/api/login",{
-        method:"POST",
-        body:JSON.stringify({
-          username:$("#u").value,
-          password:$("#p").value
-        })
-      });
+      await api(
+        "/api/login",
+        {
+          method:"POST",
+          body:JSON.stringify({
+            username:$("#u").value,
+            password:$("#p").value
+          })
+        }
+      );
 
-      let m=await api("/api/me");
+      const m=await api(
+        "/api/me"
+      );
 
       if(!m?.user){
+
         throw Error(
           "Login erfolgreich, aber keine Sitzung gefunden."
         );
@@ -143,36 +220,29 @@ function login(){
 
       STATE.me=m.user;
 
-      let s=await api("/api/state");
-
-      STATE.assignments=Object.fromEntries(
-        s.assignments.map(x=>[
-          x.task_id+"@"+x.period,
-          x.assigned_to
-        ])
-      );
-
-      STATE.completions=Object.fromEntries(
-        s.completions.map(x=>[
-          x.task_id+"@"+x.period,
-          x.completed_at
-        ])
-      );
+      await loadState();
 
       render();
 
     }catch(x){
-      $("#err").textContent=x.message;
+
+      $("#err").textContent=
+        x.message;
     }
-  }
+  };
 }
 
 function t(id){
-  return DATA.tasks.find(x=>x.id===id)
+  return DATA.tasks.find(
+    x=>x.id===id
+  );
 }
 
 function ml(k){
-  let[y,m]=k.split("-").map(Number);
+
+  let[y,m]=k
+    .split("-")
+    .map(Number);
 
   return new Intl.DateTimeFormat(
     "de-DE",
@@ -182,42 +252,28 @@ function ml(k){
     }
   ).format(
     new Date(y,m-1,1)
-  )
+  );
 }
 
 function al(id,p){
-  return STATE.assignments[id+"@"+p]||""
+  return STATE.assignments[
+    id+"@"+p
+  ]||"";
 }
 
 function done(id,p){
-  return !!STATE.completions[id+"@"+p]
-}
-
-async function complete(id,p){
-
-  await api("/api/complete",{
-    method:"POST",
-    body:JSON.stringify({
-      taskId:id,
-      period:p
-    })
-  });
-
-  let s=await api("/api/state");
-
-  STATE.completions=Object.fromEntries(
-    s.completions.map(x=>[
-      x.task_id+"@"+x.period,
-      x.completed_at
-    ])
-  );
-
-  render()
+  return !!STATE.completions[
+    id+"@"+p
+  ];
 }
 
 function row(x,p){
 
+  const assigned=
+    al(x.id,p);
+
   return `
+
     <div class="taskrow">
 
       <button
@@ -227,14 +283,27 @@ function row(x,p){
         ${done(x.id,p)?"✓":""}
       </button>
 
-      <div class="taskname ${done(x.id,p)?"completed":""}">
+      <div
+        class="taskname ${done(x.id,p)?"completed":""}"
+      >
 
         ${x.name}
 
         <div class="meta">
-          ${al(x.id,p)?al(x.id,p)+" · ":""}
-          ${x.points} Punkte
-          ${x.shared?" · gemeinsam":""}
+
+          ${assigned
+            ?assigned+" · "
+            :""
+          }
+
+          ${x.points}
+          Punkte
+
+          ${x.shared
+            ?" · gemeinsam"
+            :""
+          }
+
         </div>
 
       </div>
@@ -243,7 +312,7 @@ function row(x,p){
         ${x.points} P
       </span>
 
-    </div>`
+    </div>`;
 }
 
 function render(){
@@ -255,10 +324,11 @@ function render(){
       <div>
 
         <div class="eyebrow">
-          HAUSHALTSTASSE
+          HAUSHALTS TASSE
         </div>
 
         <h1>
+
           ${
             tab==="week"
             ?"Diese Woche"
@@ -268,6 +338,7 @@ function render(){
             ?"Aufgaben"
             :"Historie"
           }
+
         </h1>
 
       </div>
@@ -292,42 +363,98 @@ function render(){
           ["tasks","☑️","Aufgaben"],
           ["history","🎍","Historie"]
         ]
+
         .map(a=>`
 
           <button
             class="tab ${tab===a[0]?"active":""}"
             onclick="tab='${a[0]}';render()"
           >
+
             ${a[1]}
-            <span>${a[2]}</span>
+
+            <span>
+              ${a[2]}
+            </span>
+
           </button>
 
         `)
+
         .join("")
       }
 
     </nav>`;
 
   ({
-    week:week,
-    cup:cup,
-    tasks:tasks,
-    history:history
-  }[tab])()
+    week,
+    cup,
+    tasks,
+    history
+  }[tab])();
 }
 
 function week(){
 
-  let ids=DATA.tasks.filter(
-    x=>["weekly","biweekly"].includes(x.frequency)
-  );
+  const items=[
+
+    ...DATA.tasks
+      .filter(
+        x=>x.frequency==="weekly"
+      )
+      .map(x=>({
+        task:x,
+        period:STATE.periods.week
+      })),
+
+    ...(STATE.periods.biweeklyActive
+
+      ?DATA.tasks
+        .filter(
+          x=>x.frequency==="biweekly"
+        )
+        .map(x=>({
+          task:x,
+          period:STATE.periods.biweekly
+        }))
+
+      :[])
+
+  ];
+
+  const lp=
+    items
+      .filter(
+        i=>al(
+          i.task.id,
+          i.period
+        )==="Louisa"
+      )
+      .reduce(
+        (s,i)=>s+i.task.points,
+        0
+      );
+
+  const pp=
+    items
+      .filter(
+        i=>al(
+          i.task.id,
+          i.period
+        )==="Patrick"
+      )
+      .reduce(
+        (s,i)=>s+i.task.points,
+        0
+      );
 
   $("#c").innerHTML=`
 
     <div class="hero">
 
       <div class="muted">
-        Angemeldet als ${STATE.me.displayName}
+        Angemeldet als
+        ${STATE.me.displayName}
       </div>
 
       <h2>
@@ -338,6 +465,21 @@ function week(){
         Sperberweg 7
       </div>
 
+      <div
+        class="meta"
+        style="margin-top:12px"
+      >
+
+        Louisa:
+        ${lp} P
+
+        ·
+
+        Patrick:
+        ${pp} P
+
+      </div>
+
     </div>
 
     <div class="sectiontitle">
@@ -346,24 +488,40 @@ function week(){
 
     <div class="card">
 
-      ${ids.map(x=>row(x,month)).join("")}
+      ${
+        items.length
 
-    </div>`
+        ?items
+          .map(
+            i=>row(
+              i.task,
+              i.period
+            )
+          )
+          .join("")
+
+        :'<div class="empty">Keine regelmäßigen Aufgaben.</div>'
+      }
+
+    </div>`;
 }
 
 function cup(){
 
-  let ids=DATA.months[month]||[];
+  const ids=
+    DATA.months[month]||[];
 
-  let rem=ids.filter(
-    id=>!al(id,month)
-  );
+  const rem=
+    ids.filter(
+      id=>!al(id,month)
+    );
 
-  let drawn=ids.filter(
-    id=>al(id,month)
-  );
+  const drawn=
+    ids.filter(
+      id=>al(id,month)
+    );
 
-  let person=
+  const person=
     drawn.filter(
       id=>!t(id).shared
     ).length%2===0
@@ -376,7 +534,9 @@ function cup(){
 
       <div class="monthnav">
 
-        <button onclick="shift(-1)">
+        <button
+          onclick="shift(-1)"
+        >
           ‹
         </button>
 
@@ -387,13 +547,20 @@ function cup(){
           </b>
 
           <div class="muted">
-            ${ids.length} Aufgaben ·
-            ${rem.length} offen
+
+            ${ids.length}
+            Aufgaben ·
+
+            ${rem.length}
+            offen
+
           </div>
 
         </div>
 
-        <button onclick="shift(1)">
+        <button
+          onclick="shift(1)"
+        >
           ›
         </button>
 
@@ -414,17 +581,20 @@ function cup(){
         onclick="draw()"
         ${rem.length?"":"disabled"}
       >
+
         ${
           rem.length
           ?person+" zieht"
           :"Tasse ist leer"
         }
+
       </button>
 
     </div>
 
     ${
       drawn.length
+
       ?`
 
         <div class="sectiontitle">
@@ -434,27 +604,34 @@ function cup(){
         <div class="card">
 
           ${
-            drawn.map(id=>`
+            drawn
+              .map(id=>`
 
-              <div class="drawn">
+                <div class="drawn">
 
-                <strong>
-                  ${t(id).name}
-                </strong>
+                  <strong>
+                    ${t(id).name}
+                  </strong>
 
-                <div class="meta">
-                  ${al(id,month)} ·
-                  ${t(id).points} Punkte
+                  <div class="meta">
+
+                    ${al(id,month)}
+                    ·
+                    ${t(id).points}
+                    Punkte
+
+                  </div>
+
                 </div>
 
-              </div>
-
-            `).join("")
+              `)
+              .join("")
           }
 
         </div>
 
       `
+
       :""
     }
 
@@ -465,26 +642,29 @@ function cup(){
     <div class="card">
 
       ${
-        rem.map(id=>`
+        rem
+          .map(id=>`
 
-          <div class="taskrow">
+            <div class="taskrow">
 
-            <div class="taskname">
+              <div class="taskname">
 
-              ${t(id).name}
+                ${t(id).name}
 
-              <div class="meta">
-                ${t(id).points} Punkte
+                <div class="meta">
+                  ${t(id).points}
+                  Punkte
+                </div>
+
               </div>
 
             </div>
 
-          </div>
-
-        `).join("")
+          `)
+          .join("")
       }
 
-    </div>`
+    </div>`;
 }
 
 function shift(d){
@@ -508,12 +688,12 @@ function shift(d){
   month=
     `${y}-${String(m).padStart(2,"0")}`;
 
-  render()
+  render();
 }
 
 async function draw(){
 
-  let ids=
+  const ids=
     (DATA.months[month]||[])
     .filter(
       id=>!al(id,month)
@@ -521,48 +701,41 @@ async function draw(){
 
   if(!ids.length)return;
 
-  let n=
+  const n=
     ids[
       Math.floor(
         Math.random()*ids.length
       )
     ];
 
-  let x=t(n);
+  const x=t(n);
 
-  let drawn=
+  const drawn=
     (DATA.months[month]||[])
     .filter(
       id=>al(id,month)
     ).length;
 
-  let person=
-    x.shared
-      ?"shared"
-      :(drawn%2===0
-        ?"Louisa"
-        :"Patrick");
+  await api(
+    "/api/assign",
+    {
+      method:"POST",
+      body:JSON.stringify({
+        taskId:n,
+        period:month,
+        assignedTo:
+          x.shared
+          ?"shared"
+          :(drawn%2===0
+            ?"Louisa"
+            :"Patrick")
+      })
+    }
+  );
 
-  await api("/api/assign",{
-    method:"POST",
-    body:JSON.stringify({
-      taskId:n,
-      period:month,
-      assignedTo:person
-    })
-  });
+  await loadState();
 
-  let s=await api("/api/state");
-
-  STATE.assignments=
-    Object.fromEntries(
-      s.assignments.map(x=>[
-        x.task_id+"@"+x.period,
-        x.assigned_to
-      ])
-    );
-
-  render()
+  render();
 }
 
 function tasks(){
@@ -581,16 +754,24 @@ function tasks(){
           "semiannual",
           "annual"
         ]
+
         .map(f=>`
 
           <button
             class="pill ${filter===f?"active":""}"
             onclick="filter='${f}';render()"
           >
-            ${f==="all"?"Alle":f}
+
+            ${
+              f==="all"
+              ?"Alle"
+              :f
+            }
+
           </button>
 
         `)
+
         .join("")
       }
 
@@ -600,75 +781,117 @@ function tasks(){
 
       ${
         DATA.tasks
-        .filter(
-          x=>filter==="all"||
-             x.frequency===filter
-        )
-        .map(x=>`
 
-          <div class="taskrow">
+          .filter(
+            x=>
+              filter==="all"||
+              x.frequency===filter
+          )
 
-            <div class="taskname">
+          .map(x=>`
 
-              ${x.name}
+            <div class="taskrow">
 
-              <div class="meta">
-                ${x.points} Aufwandspunkte
-                ${x.shared?" · gemeinsam":""}
+              <div class="taskname">
+
+                ${x.name}
+
+                <div class="meta">
+
+                  ${x.points}
+                  Aufwandspunkte
+
+                  ${
+                    x.shared
+                    ?" · gemeinsam"
+                    :""
+                  }
+
+                </div>
+
               </div>
+
+              <span class="points">
+                ${x.points} P
+              </span>
 
             </div>
 
-            <span class="points">
-              ${x.points} P
-            </span>
+          `)
 
-          </div>
-
-        `)
-        .join("")
+          .join("")
       }
 
-    </div>`
+    </div>`;
+}
+
+async function complete(id,p){
+
+  await api(
+    "/api/complete",
+    {
+      method:"POST",
+      body:JSON.stringify({
+        taskId:id,
+        period:p
+      })
+    }
+  );
+
+  await loadState();
+
+  render();
 }
 
 async function history(){
 
-  let s=await api("/api/state");
+  const s=
+    await api("/api/state");
 
-  let rows=
+  const rows=
     s.completions
-    .slice()
-    .reverse()
-    .map(x=>`
+      .slice()
+      .reverse()
+      .map(x=>`
 
-      <div class="taskrow">
+        <div class="taskrow">
 
-        <div class="taskname">
+          <div class="taskname">
 
-          ✓ ${t(x.task_id).name}
+            ✓
+            ${t(x.task_id).name}
 
-          <div class="meta">
-            ${x.completed_by} ·
-            ${new Date(
-              x.completed_at
-            ).toLocaleDateString("de-DE")}
+            <div class="meta">
+
+              ${x.completed_by}
+              ·
+
+              ${
+                new Date(
+                  x.completed_at
+                ).toLocaleDateString(
+                  "de-DE"
+                )
+              }
+
+            </div>
+
           </div>
+
+          <span class="points">
+
+            ${
+              t(x.task_id).shared
+              ?"—"
+              :t(x.task_id).points+" P"
+            }
+
+          </span>
 
         </div>
 
-        <span class="points">
-          ${
-            t(x.task_id).shared
-            ?"—"
-            :t(x.task_id).points+" P"
-          }
-        </span>
-
-      </div>
-
-    `)
-    .join("");
+      `)
+      .join("");
 
   $("#c").innerHTML=`
 
@@ -696,19 +919,21 @@ async function history(){
         '<div class="empty">Noch keine erledigten Aufgaben.</div>'
       }
 
-    </div>`
+    </div>`;
 }
 
 async function logout(){
 
   await api(
     "/api/logout",
-    {method:"POST"}
+    {
+      method:"POST"
+    }
   );
 
-  location.reload()
+  location.reload();
 }
 
-boot().catch(()=>{
-  login()
-})
+boot().catch(
+  ()=>login()
+);
