@@ -23,331 +23,96 @@ const $=s=>document.querySelector(s);
 
 async function api(url,opt={}){
 
-  const r=await fetch(
-    url,
-    {
-      ...opt,
-      headers:{
-        "Content-Type":"application/json",
-        ...(opt.headers||{})
+  const response=
+    await fetch(
+      url,
+      {
+        ...opt,
+        headers:{
+          "Content-Type":
+            "application/json",
+          ...(opt.headers||{})
+        }
       }
-    }
-  );
+    );
 
-  const text=await r.text();
 
-  let j;
+  const text=
+    await response.text();
+
+
+  let data;
 
   try{
-    j=JSON.parse(text);
-  }catch(e){
+
+    data=
+      JSON.parse(text);
+
+  }catch(error){
+
     throw Error(
       "Serverantwort ist kein gültiges JSON ("+
-      r.status+"): "+
+      response.status+
+      "): "+
       text.slice(0,150)
     );
   }
 
-  if(!r.ok){
+
+  if(!response.ok){
+
     throw Error(
-      j.error||"HTTP "+r.status
+      data.error||
+      "HTTP "+response.status
     );
   }
 
-  return j;
+
+  return data;
 }
 
 
 /* =========================
-   ZEITRÄUME
-========================= */
-
-function isoWeek(date){
-
-  const d=new Date(
-    Date.UTC(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate()
-    )
-  );
-
-  const day=d.getUTCDay()||7;
-
-  d.setUTCDate(
-    d.getUTCDate()+4-day
-  );
-
-  const yearStart=
-    new Date(
-      Date.UTC(
-        d.getUTCFullYear(),
-        0,
-        1
-      )
-    );
-
-  const week=
-    Math.ceil(
-      (
-        (
-          (d-yearStart)/86400000
-        )+1
-      )/7
-    );
-
-  return {
-    year:d.getUTCFullYear(),
-    week,
-    key:
-      `${d.getUTCFullYear()}-W${String(week).padStart(2,"0")}`
-  };
-}
-
-
-function getPeriods(){
-
-  const now=new Date();
-
-  const w=isoWeek(now);
-
-  const anchor=
-    new Date("2026-10-05T00:00:00");
-
-  const monday=
-    new Date(now);
-
-  const day=
-    monday.getDay()||7;
-
-  monday.setHours(0,0,0,0);
-  monday.setDate(
-    monday.getDate()-(day-1)
-  );
-
-  const diffWeeks=
-    Math.round(
-      (
-        monday-anchor
-      )/
-      (7*24*60*60*1000)
-    );
-
-  return {
-
-    week:
-      "weekly:"+w.key,
-
-    weekLabel:
-      w.key,
-
-    biweeklyActive:
-      diffWeeks>=0 &&
-      diffWeeks%2===0,
-
-    biweekly:
-      diffWeeks>=0 &&
-      diffWeeks%2===0
-        ?"biweekly:"+w.key
-        :null
-  };
-}
-
-
-/* =========================
-   STATE
+   STATE LADEN
 ========================= */
 
 async function loadState(){
 
-  const s=
+  const data=
     await api("/api/state");
+
 
   STATE.assignments=
     Object.fromEntries(
-      (s.assignments||[]).map(x=>[
-        x.task_id+"@"+x.period,
-        x.assigned_to
-      ])
+      (data.assignments||[])
+        .map(item=>[
+          item.task_id+
+          "@"+
+          item.period,
+          item.assigned_to
+        ])
     );
+
 
   STATE.completions=
     Object.fromEntries(
-      (s.completions||[]).map(x=>[
-        x.task_id+"@"+x.period,
-        x.completed_at
-      ])
+      (data.completions||[])
+        .map(item=>[
+          item.task_id+
+          "@"+
+          item.period,
+          item.completed_at
+        ])
     );
+
 
   STATE.periods=
-    s.periods||getPeriods();
+    data.periods||{};
 }
 
 
 /* =========================
-   AUTOMATISCHE ZUTEILUNG
-========================= */
-
-async function ensureWeeklyAssignments(){
-
-  const periods=
-    STATE.periods;
-
-  const recurring=
-    DATA.tasks.filter(
-      x=>
-        !x.shared &&
-        (
-          x.frequency==="weekly" ||
-          x.frequency==="biweekly"
-        )
-    );
-
-  const jobs=[];
-
-  for(const task of recurring){
-
-    let period=null;
-
-    if(task.frequency==="weekly"){
-      period=periods.week;
-    }
-
-    if(
-      task.frequency==="biweekly" &&
-      periods.biweeklyActive
-    ){
-      period=periods.biweekly;
-    }
-
-    if(!period)continue;
-
-    const key=
-      task.id+"@"+period;
-
-    if(
-      STATE.assignments[key]
-    ){
-      continue;
-    }
-
-    jobs.push({
-      task,
-      period
-    });
-  }
-
-  if(!jobs.length){
-    return;
-  }
-
-
-  /*
-     Belastung anhand der bereits
-     vorhandenen Zuteilungen.
-
-     Aufwandspunkte zählen,
-     nicht Anzahl der Aufgaben.
-  */
-
-  const load={
-    Louisa:0,
-    Patrick:0
-  };
-
-  for(const assignment of Object.entries(
-    STATE.assignments
-  )){
-
-    const assigned=assignment[1];
-
-    if(
-      assigned!=="Louisa" &&
-      assigned!=="Patrick"
-    ){
-      continue;
-    }
-
-    const taskId=
-      Number(
-        assignment[0]
-          .split("@")[0]
-      );
-
-    const task=
-      DATA.tasks.find(
-        x=>x.id===taskId
-      );
-
-    if(task){
-      load[assigned]+=
-        Number(task.points)||0;
-    }
-  }
-
-
-  /*
-     Aufgaben einzeln verteilen.
-     Wer bisher weniger Punkte hat,
-     bekommt eine höhere Chance.
-     Bei gleichem Stand entscheidet
-     der Zufall.
-  */
-
-  for(const job of jobs){
-
-    const l=load.Louisa;
-    const p=load.Patrick;
-
-    let assigned;
-
-    if(l===p){
-
-      assigned=
-        Math.random()<0.5
-          ?"Louisa"
-          :"Patrick";
-
-    }else if(l<p){
-
-      assigned=
-        Math.random()<0.75
-          ?"Louisa"
-          :"Patrick";
-
-    }else{
-
-      assigned=
-        Math.random()<0.75
-          ?"Patrick"
-          :"Louisa";
-    }
-
-
-    await api(
-      "/api/assign",
-      {
-        method:"POST",
-        body:JSON.stringify({
-          taskId:job.task.id,
-          period:job.period,
-          assignedTo:assigned
-        })
-      }
-    );
-
-    STATE.assignments[
-      job.task.id+"@"+job.period
-    ]=assigned;
-
-    load[assigned]+=
-      Number(job.task.points)||0;
-  }
-}
-
-
-/* =========================
-   START
+   APP START
 ========================= */
 
 async function boot(){
@@ -355,30 +120,21 @@ async function boot(){
   DATA=
     await(
       await fetch(
-        "/data.json?v=20260925"
+        "/data.json?v=202609252030"
       )
     ).json();
 
-  const m=
+
+  const me=
     await api("/api/me");
 
-  if(m?.user){
 
-    STATE.me=m.user;
+  if(me?.user){
+
+    STATE.me=
+      me.user;
 
     await loadState();
-
-    /*
-       Falls der Server die Zeiträume
-       nicht liefert, erzeugen wir sie
-       hier selbst.
-    */
-    if(!STATE.periods.week){
-      STATE.periods=
-        getPeriods();
-    }
-
-    await ensureWeeklyAssignments();
 
     render();
 
@@ -456,8 +212,11 @@ function login(){
 
           </div>
 
-          <button class="drawbtn">
-            Und los!
+          <button
+            class="drawbtn"
+            type="submit"
+          >
+            Anmelden
           </button>
 
           <p
@@ -473,45 +232,47 @@ function login(){
   `;
 
 
-  $("#lf").onsubmit=async e=>{
+  $("#lf").onsubmit=
+    async event=>{
 
-    e.preventDefault();
+      event.preventDefault();
 
-    try{
 
-      await api(
-        "/api/login",
-        {
-          method:"POST",
-          body:JSON.stringify({
-            username:$("#u").value,
-            password:$("#p").value
-          })
-        }
-      );
+      try{
 
-      const m=
-        await api("/api/me");
+        await api(
+          "/api/login",
+          {
+            method:"POST",
+            body:JSON.stringify({
+              username:
+                $("#u").value,
 
-      STATE.me=m.user;
+              password:
+                $("#p").value
+            })
+          }
+        );
 
-      await loadState();
 
-      if(!STATE.periods.week){
-        STATE.periods=
-          getPeriods();
+        const me=
+          await api("/api/me");
+
+
+        STATE.me=
+          me.user;
+
+
+        await loadState();
+
+        render();
+
+      }catch(error){
+
+        $("#err").textContent=
+          error.message;
       }
-
-      await ensureWeeklyAssignments();
-
-      render();
-
-    }catch(x){
-
-      $("#err").textContent=
-        x.message;
-    }
-  };
+    };
 }
 
 
@@ -519,19 +280,24 @@ function login(){
    HILFSFUNKTIONEN
 ========================= */
 
-function t(id){
+function task(id){
 
   return DATA.tasks.find(
-    x=>x.id===id
+    item=>item.id===id
   );
 }
 
 
-function ml(k){
+function monthLabel(key){
 
-  let[y,m]=k
-    .split("-")
-    .map(Number);
+  const [
+    year,
+    monthNumber
+  ]=
+    key
+      .split("-")
+      .map(Number);
+
 
   return new Intl.DateTimeFormat(
     "de-DE",
@@ -540,27 +306,41 @@ function ml(k){
       year:"numeric"
     }
   ).format(
-    new Date(y,m-1,1)
+    new Date(
+      year,
+      monthNumber-1,
+      1
+    )
   );
 }
 
 
-function al(id,p){
+function assignedTo(
+  taskId,
+  period
+){
 
-  if(!p)return "";
+  if(!period){
+    return "";
+  }
 
   return STATE.assignments[
-    id+"@"+p
+    taskId+"@"+period
   ]||"";
 }
 
 
-function done(id,p){
+function isDone(
+  taskId,
+  period
+){
 
-  if(!p)return false;
+  if(!period){
+    return false;
+  }
 
   return !!STATE.completions[
-    id+"@"+p
+    taskId+"@"+period
   ];
 }
 
@@ -569,45 +349,81 @@ function done(id,p){
    AUFGABENZEILE
 ========================= */
 
-function row(x,p){
+function taskRow(
+  item,
+  period
+){
 
   const assigned=
-    al(x.id,p);
+    assignedTo(
+      item.id,
+      period
+    );
+
 
   const completed=
-    done(x.id,p);
+    isDone(
+      item.id,
+      period
+    );
+
 
   return `
 
     <div class="taskrow">
 
       <button
-        class="check ${completed?"done":""}"
-        onclick="complete(${x.id},'${p}')"
-        ${completed?"disabled":""}
+        class="check ${
+          completed
+            ?"done"
+            :""
+        }"
+        onclick="completeTask(
+          ${item.id},
+          '${period}'
+        )"
+        ${
+          completed
+            ?"disabled"
+            :""
+        }
       >
-        ${completed?"✓":""}
+
+        ${
+          completed
+            ?"✓"
+            :""
+        }
+
       </button>
 
+
       <div
-        class="taskname ${completed?"completed":""}"
+        class="
+          taskname
+          ${
+            completed
+              ?"completed"
+              :""
+          }
+        "
       >
 
-        ${x.name}
+        ${item.name}
 
         <div class="meta">
 
           ${
             assigned
               ?assigned+" · "
-              :"Noch nicht zugeteilt · "
+              :""
           }
 
-          ${x.points}
+          ${item.points}
           Punkte
 
           ${
-            x.shared
+            item.shared
               ?" · gemeinsam"
               :""
           }
@@ -616,8 +432,9 @@ function row(x,p){
 
       </div>
 
+
       <span class="points">
-        ${x.points} P
+        ${item.points} P
       </span>
 
     </div>
@@ -638,7 +455,7 @@ function render(){
       <div>
 
         <div class="eyebrow">
-          HAUSHALTSTASSE
+          HAUSHALTS TASSE
         </div>
 
         <h1>
@@ -647,7 +464,7 @@ function render(){
             tab==="week"
               ?"Diese Woche"
               :tab==="cup"
-              ?"Cup"
+              ?"Monats-Tasse"
               :tab==="tasks"
               ?"Aufgaben"
               :"Historie"
@@ -656,6 +473,7 @@ function render(){
         </h1>
 
       </div>
+
 
       <button
         class="iconbtn"
@@ -666,28 +484,56 @@ function render(){
 
     </header>
 
+
     <main id="c"></main>
+
 
     <nav class="tabbar">
 
       ${
         [
-          ["week","🗓️","Diese Woche"],
-          ["cup","☕️","Cup"],
-          ["tasks","☑️","Aufgaben"],
-          ["history","🎍","Historie"]
+          [
+            "week",
+            "🗓️",
+            "Diese Woche"
+          ],
+          [
+            "cup",
+            "☕️",
+            "Monats-Tasse"
+          ],
+          [
+            "tasks",
+            "☑️",
+            "Aufgaben"
+          ],
+          [
+            "history",
+            "🎍",
+            "Historie"
+          ]
         ]
-        .map(a=>`
+        .map(item=>`
 
           <button
-            class="tab ${tab===a[0]?"active":""}"
-            onclick="tab='${a[0]}';render()"
+            class="
+              tab
+              ${
+                tab===item[0]
+                  ?"active"
+                  :""
+              }
+            "
+            onclick="
+              tab='${item[0]}';
+              render();
+            "
           >
 
-            ${a[1]}
+            ${item[1]}
 
             <span>
-              ${a[2]}
+              ${item[2]}
             </span>
 
           </button>
@@ -698,6 +544,7 @@ function render(){
 
     </nav>
   `;
+
 
   ({
     week,
@@ -718,74 +565,86 @@ function week(){
 
 
   /*
-     Wöchentliche Aufgaben
+     Alle wöchentlichen Aufgaben.
   */
-
   DATA.tasks
     .filter(
-      x=>x.frequency==="weekly"
+      item=>
+        item.frequency==="weekly"
     )
-    .forEach(x=>{
+    .forEach(item=>{
 
       items.push({
-        task:x,
-        period:STATE.periods.week
+        task:item,
+        period:
+          STATE.periods.week
       });
 
     });
 
 
   /*
-     Zweiwöchentliche Aufgaben
+     Zweiwöchentliche Aufgaben nur
+     in den entsprechenden Wochen.
   */
-
   if(
     STATE.periods.biweeklyActive
   ){
 
     DATA.tasks
       .filter(
-        x=>x.frequency==="biweekly"
+        item=>
+          item.frequency==="biweekly"
       )
-      .forEach(x=>{
+      .forEach(item=>{
 
         items.push({
-          task:x,
-          period:STATE.periods.biweekly
+          task:item,
+          period:
+            STATE.periods.biweekly
         });
 
       });
   }
 
 
-  const lp=
+  /*
+     Aufwand der aktuellen Woche.
+  */
+  const louisaPoints=
     items
       .filter(
-        i=>
-          al(
-            i.task.id,
-            i.period
+        item=>
+          assignedTo(
+            item.task.id,
+            item.period
           )==="Louisa"
       )
       .reduce(
-        (s,i)=>
-          s+i.task.points,
+        (sum,item)=>
+          sum+
+          Number(
+            item.task.points
+          ),
         0
       );
 
 
-  const pp=
+  const patrickPoints=
     items
       .filter(
-        i=>
-          al(
-            i.task.id,
-            i.period
+        item=>
+          assignedTo(
+            item.task.id,
+            item.period
           )==="Patrick"
       )
       .reduce(
-        (s,i)=>
-          s+i.task.points,
+        (sum,item)=>
+          sum+
+          Number(
+            item.task.points
+          ),
         0
       );
 
@@ -813,20 +672,22 @@ function week(){
       >
 
         Louisa:
-        ${lp} P
+        ${louisaPoints} P
 
         ·
 
         Patrick:
-        ${pp} P
+        ${patrickPoints} P
 
       </div>
 
     </div>
 
+
     <div class="sectiontitle">
       Regelmäßige Aufgaben
     </div>
+
 
     <div class="card">
 
@@ -835,10 +696,10 @@ function week(){
 
           ?items
             .map(
-              i=>
-                row(
-                  i.task,
-                  i.period
+              item=>
+                taskRow(
+                  item.task,
+                  item.period
                 )
             )
             .join("")
@@ -864,19 +725,31 @@ function cup(){
   const ids=
     DATA.months[month]||[];
 
-  const rem=
+
+  const remaining=
     ids.filter(
-      id=>!al(id,month)
+      id=>
+        !assignedTo(
+          id,
+          month
+        )
     );
+
 
   const drawn=
     ids.filter(
-      id=>al(id,month)
+      id=>
+        assignedTo(
+          id,
+          month
+        )
     );
+
 
   const person=
     drawn.filter(
-      id=>!t(id).shared
+      id=>
+        !task(id).shared
     ).length%2===0
       ?"Louisa"
       :"Patrick";
@@ -889,15 +762,16 @@ function cup(){
       <div class="monthnav">
 
         <button
-          onclick="shift(-1)"
+          onclick="shiftMonth(-1)"
         >
           ‹
         </button>
 
+
         <div>
 
           <b>
-            ${ml(month)}
+            ${monthLabel(month)}
           </b>
 
           <div class="muted">
@@ -905,35 +779,46 @@ function cup(){
             ${ids.length}
             Aufgaben ·
 
-            ${rem.length}
+            ${remaining.length}
             offen
 
           </div>
 
         </div>
 
+
         <button
-          onclick="shift(1)"
+          onclick="shiftMonth(1)"
         >
           ›
         </button>
 
       </div>
 
+
       <div class="cup">
+
+        <div class="steam">
+          ∿ ∿
+        </div>
 
         <div class="cupshape"></div>
 
       </div>
 
+
       <button
         class="drawbtn"
-        onclick="draw()"
-        ${rem.length?"":"disabled"}
+        onclick="drawTask()"
+        ${
+          remaining.length
+            ?""
+            :"disabled"
+        }
       >
 
         ${
-          rem.length
+          remaining.length
             ?person+" zieht"
             :"Tasse ist leer"
         }
@@ -961,14 +846,21 @@ function cup(){
                   <div class="drawn">
 
                     <strong>
-                      ${t(id).name}
+                      ${task(id).name}
                     </strong>
 
                     <div class="meta">
 
-                      ${al(id,month)}
+                      ${
+                        assignedTo(
+                          id,
+                          month
+                        )
+                      }
+
                       ·
-                      ${t(id).points}
+
+                      ${task(id).points}
                       Punkte
 
                     </div>
@@ -991,20 +883,21 @@ function cup(){
       Noch in der Tasse
     </div>
 
+
     <div class="card">
 
       ${
-        rem
+        remaining
           .map(id=>`
 
             <div class="taskrow">
 
               <div class="taskname">
 
-                ${t(id).name}
+                ${task(id).name}
 
                 <div class="meta">
-                  ${t(id).points}
+                  ${task(id).points}
                   Punkte
                 </div>
 
@@ -1025,26 +918,39 @@ function cup(){
    MONAT WECHSELN
 ========================= */
 
-function shift(d){
+function shiftMonth(direction){
 
-  let[y,m]=month
-    .split("-")
-    .map(Number);
+  let[
+    year,
+    monthNumber
+  ]=
+    month
+      .split("-")
+      .map(Number);
 
-  m+=d;
 
-  if(m<1){
-    m=12;
-    y--;
+  monthNumber+=direction;
+
+
+  if(monthNumber<1){
+
+    monthNumber=12;
+    year--;
   }
 
-  if(m>12){
-    m=1;
-    y++;
+
+  if(monthNumber>12){
+
+    monthNumber=1;
+    year++;
   }
+
 
   month=
-    `${y}-${String(m).padStart(2,"0")}`;
+    `${year}-${String(
+      monthNumber
+    ).padStart(2,"0")}`;
+
 
   render();
 }
@@ -1054,30 +960,55 @@ function shift(d){
    TASSE ZIEHEN
 ========================= */
 
-async function draw(){
+async function drawTask(){
 
   const ids=
-    (DATA.months[month]||[])
-      .filter(
-        id=>!al(id,month)
-      );
+    (
+      DATA.months[month]||[]
+    ).filter(
+      id=>
+        !assignedTo(
+          id,
+          month
+        )
+    );
 
-  if(!ids.length)return;
 
-  const n=
+  if(!ids.length){
+    return;
+  }
+
+
+  const id=
     ids[
       Math.floor(
         Math.random()*ids.length
       )
     ];
 
-  const x=t(n);
 
-  const drawn=
-    (DATA.months[month]||[])
-      .filter(
-        id=>al(id,month)
-      ).length;
+  const item=
+    task(id);
+
+
+  const alreadyDrawn=
+    (
+      DATA.months[month]||[]
+    ).filter(
+      taskId=>
+        assignedTo(
+          taskId,
+          month
+        )
+    ).length;
+
+
+  const assigned=
+    item.shared
+      ?"shared"
+      :alreadyDrawn%2===0
+        ?"Louisa"
+        :"Patrick";
 
 
   await api(
@@ -1086,16 +1017,11 @@ async function draw(){
       method:"POST",
       body:JSON.stringify({
 
-        taskId:n,
+        taskId:id,
 
         period:month,
 
-        assignedTo:
-          x.shared
-            ?"shared"
-            :(drawn%2===0
-              ?"Louisa"
-              :"Patrick")
+        assignedTo:assigned
 
       })
     }
@@ -1109,43 +1035,55 @@ async function draw(){
 
 
 /* =========================
-   AUFGABEN
+   ALLE AUFGABEN
 ========================= */
 
 function tasks(){
+
+  const frequencies=[
+    "all",
+    "weekly",
+    "biweekly",
+    "bimonthly",
+    "quarterly",
+    "semiannual",
+    "annual"
+  ];
+
 
   $("#c").innerHTML=`
 
     <div class="pillrow">
 
       ${
-        [
-          "alle",
-          "wöchentlich",
-          "zweiwöchentlich",
-          "alle zwei Monate",
-          "quartalsweise",
-          "halbjährlich",
-          "jährlich"
-        ]
+        frequencies
+          .map(f=>`
 
-        .map(f=>`
+            <button
+              class="
+                pill
+                ${
+                  filter===f
+                    ?"active"
+                    :""
+                }
+              "
+              onclick="
+                filter='${f}';
+                render();
+              "
+            >
 
-          <button
-            class="pill ${filter===f?"active":""}"
-            onclick="filter='${f}';render()"
-          >
+              ${
+                f==="all"
+                  ?"Alle"
+                  :f
+              }
 
-            ${
-              f==="all"
-                ?"Alle"
-                :f
-            }
+            </button>
 
-          </button>
-
-        `)
-        .join("")
+          `)
+          .join("")
       }
 
     </div>
@@ -1155,28 +1093,26 @@ function tasks(){
 
       ${
         DATA.tasks
-
           .filter(
-            x=>
+            item=>
               filter==="all"||
-              x.frequency===filter
+              item.frequency===filter
           )
-
-          .map(x=>`
+          .map(item=>`
 
             <div class="taskrow">
 
               <div class="taskname">
 
-                ${x.name}
+                ${item.name}
 
                 <div class="meta">
 
-                  ${x.points}
+                  ${item.points}
                   Aufwandspunkte
 
                   ${
-                    x.shared
+                    item.shared
                       ?" · gemeinsam"
                       :""
                   }
@@ -1185,8 +1121,9 @@ function tasks(){
 
               </div>
 
+
               <span class="points">
-                ${x.points} P
+                ${item.points} P
               </span>
 
             </div>
@@ -1201,17 +1138,23 @@ function tasks(){
 
 
 /* =========================
-   ABHAKEN
+   AUFGABE ABHAKEN
 ========================= */
 
-async function complete(id,p){
+async function completeTask(
+  taskId,
+  period
+){
 
-  if(!p){
+  if(!period){
+
     alert(
-      "Für diese Aufgabe wurde noch kein Zeitraum festgelegt."
+      "Für diese Aufgabe ist kein Zeitraum vorhanden."
     );
+
     return;
   }
+
 
   try{
 
@@ -1219,21 +1162,23 @@ async function complete(id,p){
       "/api/complete",
       {
         method:"POST",
+
         body:JSON.stringify({
-          taskId:id,
-          period:p
+          taskId,
+          period
         })
       }
     );
+
 
     await loadState();
 
     render();
 
-  }catch(e){
+  }catch(error){
 
     alert(
-      e.message
+      error.message
     );
   }
 }
@@ -1245,19 +1190,26 @@ async function complete(id,p){
 
 async function history(){
 
-  const s=
-    await api("/api/state");
+  const state=
+    await api(
+      "/api/state"
+    );
+
 
   const rows=
-    (s.completions||[])
+    (state.completions||[])
       .slice()
       .reverse()
-      .map(x=>{
+      .map(item=>{
 
-        const task=
-          t(x.task_id);
+        const currentTask=
+          task(item.task_id);
 
-        if(!task)return "";
+
+        if(!currentTask){
+          return "";
+        }
+
 
         return `
 
@@ -1266,16 +1218,17 @@ async function history(){
             <div class="taskname">
 
               ✓
-              ${task.name}
+              ${currentTask.name}
 
               <div class="meta">
 
-                ${x.completed_by}
+                ${item.completed_by}
+
                 ·
 
                 ${
                   new Date(
-                    x.completed_at
+                    item.completed_at
                   ).toLocaleDateString(
                     "de-DE"
                   )
@@ -1285,18 +1238,19 @@ async function history(){
 
             </div>
 
+
             <span class="points">
 
               ${
-                task.shared
+                currentTask.shared
                   ?"—"
-                  :task.points+" P"
+                  :currentTask.points+
+                    " P"
               }
 
             </span>
 
           </div>
-
         `;
       })
       .join("");
@@ -1321,6 +1275,7 @@ async function history(){
 
     </div>
 
+
     <div class="card">
 
       ${
@@ -1343,24 +1298,32 @@ async function history(){
 
 async function logout(){
 
-  await api(
-    "/api/logout",
-    {
-      method:"POST"
-    }
-  );
+  try{
 
-  location.reload();
+    await api(
+      "/api/logout",
+      {
+        method:"POST"
+      }
+    );
+
+  }finally{
+
+    location.reload();
+  }
 }
 
 
 /* =========================
-   START
+   STARTEN
 ========================= */
 
-boot().catch(
-  e=>{
-    console.error(e);
-    login();
-  }
-);
+boot().catch(error=>{
+
+  console.error(
+    "Boot-Fehler:",
+    error
+  );
+
+  login();
+});
