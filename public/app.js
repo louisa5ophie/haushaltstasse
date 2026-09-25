@@ -16,71 +16,156 @@ let month="2026-10";
 
 const $=s=>document.querySelector(s);
 
+
+/* =========================
+   API
+========================= */
+
 async function api(url,opt={}){
 
-  try{
-
-    const r=await fetch(
-      url,
-      {
-        ...opt,
-        headers:{
-          "Content-Type":"application/json",
-          ...(opt.headers||{})
-        }
+  const r=await fetch(
+    url,
+    {
+      ...opt,
+      headers:{
+        "Content-Type":"application/json",
+        ...(opt.headers||{})
       }
-    );
-
-    const text=await r.text();
-
-    let j;
-
-    try{
-      j=JSON.parse(text);
-    }catch(e){
-      throw Error(
-        "Serverantwort ist kein gültiges JSON ("+
-        r.status+"): "+
-        text.slice(0,120)
-      );
     }
+  );
 
-    if(r.status===401){
-      throw Error(
-        "Login abgelehnt (HTTP 401)."
-      );
-    }
+  const text=await r.text();
 
-    if(!r.ok){
-      throw Error(
-        j.error||"HTTP "+r.status
-      );
-    }
+  let j;
 
-    return j;
-
+  try{
+    j=JSON.parse(text);
   }catch(e){
-
-    console.error(
-      "API-Fehler:",
-      url,
-      e
-    );
-
     throw Error(
-      "API-Fehler: "+
-      (e?.message||String(e))
+      "Serverantwort ist kein gültiges JSON ("+
+      r.status+"): "+
+      text.slice(0,150)
     );
   }
+
+  if(!r.ok){
+    throw Error(
+      j.error||"HTTP "+r.status
+    );
+  }
+
+  return j;
 }
+
+
+/* =========================
+   ZEITRÄUME
+========================= */
+
+function isoWeek(date){
+
+  const d=new Date(
+    Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    )
+  );
+
+  const day=d.getUTCDay()||7;
+
+  d.setUTCDate(
+    d.getUTCDate()+4-day
+  );
+
+  const yearStart=
+    new Date(
+      Date.UTC(
+        d.getUTCFullYear(),
+        0,
+        1
+      )
+    );
+
+  const week=
+    Math.ceil(
+      (
+        (
+          (d-yearStart)/86400000
+        )+1
+      )/7
+    );
+
+  return {
+    year:d.getUTCFullYear(),
+    week,
+    key:
+      `${d.getUTCFullYear()}-W${String(week).padStart(2,"0")}`
+  };
+}
+
+
+function getPeriods(){
+
+  const now=new Date();
+
+  const w=isoWeek(now);
+
+  const anchor=
+    new Date("2026-10-05T00:00:00");
+
+  const monday=
+    new Date(now);
+
+  const day=
+    monday.getDay()||7;
+
+  monday.setHours(0,0,0,0);
+  monday.setDate(
+    monday.getDate()-(day-1)
+  );
+
+  const diffWeeks=
+    Math.round(
+      (
+        monday-anchor
+      )/
+      (7*24*60*60*1000)
+    );
+
+  return {
+
+    week:
+      "weekly:"+w.key,
+
+    weekLabel:
+      w.key,
+
+    biweeklyActive:
+      diffWeeks>=0 &&
+      diffWeeks%2===0,
+
+    biweekly:
+      diffWeeks>=0 &&
+      diffWeeks%2===0
+        ?"biweekly:"+w.key
+        :null
+  };
+}
+
+
+/* =========================
+   STATE
+========================= */
 
 async function loadState(){
 
-  const s=await api("/api/state");
+  const s=
+    await api("/api/state");
 
   STATE.assignments=
     Object.fromEntries(
-      s.assignments.map(x=>[
+      (s.assignments||[]).map(x=>[
         x.task_id+"@"+x.period,
         x.assigned_to
       ])
@@ -88,23 +173,194 @@ async function loadState(){
 
   STATE.completions=
     Object.fromEntries(
-      s.completions.map(x=>[
+      (s.completions||[]).map(x=>[
         x.task_id+"@"+x.period,
         x.completed_at
       ])
     );
 
-  STATE.periods=s.periods||{};
+  STATE.periods=
+    s.periods||getPeriods();
 }
+
+
+/* =========================
+   AUTOMATISCHE ZUTEILUNG
+========================= */
+
+async function ensureWeeklyAssignments(){
+
+  const periods=
+    STATE.periods;
+
+  const recurring=
+    DATA.tasks.filter(
+      x=>
+        !x.shared &&
+        (
+          x.frequency==="weekly" ||
+          x.frequency==="biweekly"
+        )
+    );
+
+  const jobs=[];
+
+  for(const task of recurring){
+
+    let period=null;
+
+    if(task.frequency==="weekly"){
+      period=periods.week;
+    }
+
+    if(
+      task.frequency==="biweekly" &&
+      periods.biweeklyActive
+    ){
+      period=periods.biweekly;
+    }
+
+    if(!period)continue;
+
+    const key=
+      task.id+"@"+period;
+
+    if(
+      STATE.assignments[key]
+    ){
+      continue;
+    }
+
+    jobs.push({
+      task,
+      period
+    });
+  }
+
+  if(!jobs.length){
+    return;
+  }
+
+
+  /*
+     Belastung anhand der bereits
+     vorhandenen Zuteilungen.
+
+     Aufwandspunkte zählen,
+     nicht Anzahl der Aufgaben.
+  */
+
+  const load={
+    Louisa:0,
+    Patrick:0
+  };
+
+  for(const assignment of Object.entries(
+    STATE.assignments
+  )){
+
+    const assigned=assignment[1];
+
+    if(
+      assigned!=="Louisa" &&
+      assigned!=="Patrick"
+    ){
+      continue;
+    }
+
+    const taskId=
+      Number(
+        assignment[0]
+          .split("@")[0]
+      );
+
+    const task=
+      DATA.tasks.find(
+        x=>x.id===taskId
+      );
+
+    if(task){
+      load[assigned]+=
+        Number(task.points)||0;
+    }
+  }
+
+
+  /*
+     Aufgaben einzeln verteilen.
+     Wer bisher weniger Punkte hat,
+     bekommt eine höhere Chance.
+     Bei gleichem Stand entscheidet
+     der Zufall.
+  */
+
+  for(const job of jobs){
+
+    const l=load.Louisa;
+    const p=load.Patrick;
+
+    let assigned;
+
+    if(l===p){
+
+      assigned=
+        Math.random()<0.5
+          ?"Louisa"
+          :"Patrick";
+
+    }else if(l<p){
+
+      assigned=
+        Math.random()<0.75
+          ?"Louisa"
+          :"Patrick";
+
+    }else{
+
+      assigned=
+        Math.random()<0.75
+          ?"Patrick"
+          :"Louisa";
+    }
+
+
+    await api(
+      "/api/assign",
+      {
+        method:"POST",
+        body:JSON.stringify({
+          taskId:job.task.id,
+          period:job.period,
+          assignedTo:assigned
+        })
+      }
+    );
+
+    STATE.assignments[
+      job.task.id+"@"+job.period
+    ]=assigned;
+
+    load[assigned]+=
+      Number(job.task.points)||0;
+  }
+}
+
+
+/* =========================
+   START
+========================= */
 
 async function boot(){
 
   DATA=
     await(
-      await fetch("/data.json")
+      await fetch(
+        "/data.json?v=20260925"
+      )
     ).json();
 
-  const m=await api("/api/me");
+  const m=
+    await api("/api/me");
 
   if(m?.user){
 
@@ -112,16 +368,41 @@ async function boot(){
 
     await loadState();
 
+    /*
+       Falls der Server die Zeiträume
+       nicht liefert, erzeugen wir sie
+       hier selbst.
+    */
+    if(!STATE.periods.week){
+      STATE.periods=
+        getPeriods();
+    }
+
+    await ensureWeeklyAssignments();
+
     render();
+
+  }else{
+
+    login();
   }
 }
+
+
+/* =========================
+   LOGIN
+========================= */
 
 function login(){
 
   document.body.innerHTML=`
 
     <main
-      style="max-width:420px;margin:12vh auto;padding:20px"
+      style="
+        max-width:420px;
+        margin:12vh auto;
+        padding:20px
+      "
     >
 
       <div class="card">
@@ -188,7 +469,9 @@ function login(){
 
       </div>
 
-    </main>`;
+    </main>
+  `;
+
 
   $("#lf").onsubmit=async e=>{
 
@@ -207,20 +490,19 @@ function login(){
         }
       );
 
-      const m=await api(
-        "/api/me"
-      );
-
-      if(!m?.user){
-
-        throw Error(
-          "Login erfolgreich, aber keine Sitzung gefunden."
-        );
-      }
+      const m=
+        await api("/api/me");
 
       STATE.me=m.user;
 
       await loadState();
+
+      if(!STATE.periods.week){
+        STATE.periods=
+          getPeriods();
+      }
+
+      await ensureWeeklyAssignments();
 
       render();
 
@@ -232,11 +514,18 @@ function login(){
   };
 }
 
+
+/* =========================
+   HILFSFUNKTIONEN
+========================= */
+
 function t(id){
+
   return DATA.tasks.find(
     x=>x.id===id
   );
 }
+
 
 function ml(k){
 
@@ -255,53 +544,72 @@ function ml(k){
   );
 }
 
+
 function al(id,p){
+
+  if(!p)return "";
+
   return STATE.assignments[
     id+"@"+p
   ]||"";
 }
 
+
 function done(id,p){
+
+  if(!p)return false;
+
   return !!STATE.completions[
     id+"@"+p
   ];
 }
+
+
+/* =========================
+   AUFGABENZEILE
+========================= */
 
 function row(x,p){
 
   const assigned=
     al(x.id,p);
 
+  const completed=
+    done(x.id,p);
+
   return `
 
     <div class="taskrow">
 
       <button
-        class="check ${done(x.id,p)?"done":""}"
+        class="check ${completed?"done":""}"
         onclick="complete(${x.id},'${p}')"
+        ${completed?"disabled":""}
       >
-        ${done(x.id,p)?"✓":""}
+        ${completed?"✓":""}
       </button>
 
       <div
-        class="taskname ${done(x.id,p)?"completed":""}"
+        class="taskname ${completed?"completed":""}"
       >
 
         ${x.name}
 
         <div class="meta">
 
-          ${assigned
-            ?assigned+" · "
-            :""
+          ${
+            assigned
+              ?assigned+" · "
+              :"Noch nicht zugeteilt · "
           }
 
           ${x.points}
           Punkte
 
-          ${x.shared
-            ?" · gemeinsam"
-            :""
+          ${
+            x.shared
+              ?" · gemeinsam"
+              :""
           }
 
         </div>
@@ -312,8 +620,14 @@ function row(x,p){
         ${x.points} P
       </span>
 
-    </div>`;
+    </div>
+  `;
 }
+
+
+/* =========================
+   HAUPTANSICHT
+========================= */
 
 function render(){
 
@@ -331,12 +645,12 @@ function render(){
 
           ${
             tab==="week"
-            ?"Diese Woche"
-            :tab==="cup"
-            ?"Monats-Tasse"
-            :tab==="tasks"
-            ?"Aufgaben"
-            :"Historie"
+              ?"Diese Woche"
+              :tab==="cup"
+              ?"Monats-Tasse"
+              :tab==="tasks"
+              ?"Aufgaben"
+              :"Historie"
           }
 
         </h1>
@@ -363,7 +677,6 @@ function render(){
           ["tasks","☑️","Aufgaben"],
           ["history","🎍","Historie"]
         ]
-
         .map(a=>`
 
           <button
@@ -380,11 +693,11 @@ function render(){
           </button>
 
         `)
-
         .join("")
       }
 
-    </nav>`;
+    </nav>
+  `;
 
   ({
     week,
@@ -394,59 +707,88 @@ function render(){
   }[tab])();
 }
 
+
+/* =========================
+   DIESE WOCHE
+========================= */
+
 function week(){
 
-  const items=[
+  const items=[];
 
-    ...DATA.tasks
-      .filter(
-        x=>x.frequency==="weekly"
-      )
-      .map(x=>({
+
+  /*
+     Wöchentliche Aufgaben
+  */
+
+  DATA.tasks
+    .filter(
+      x=>x.frequency==="weekly"
+    )
+    .forEach(x=>{
+
+      items.push({
         task:x,
         period:STATE.periods.week
-      })),
+      });
 
-    ...(STATE.periods.biweeklyActive
+    });
 
-      ?DATA.tasks
-        .filter(
-          x=>x.frequency==="biweekly"
-        )
-        .map(x=>({
+
+  /*
+     Zweiwöchentliche Aufgaben
+  */
+
+  if(
+    STATE.periods.biweeklyActive
+  ){
+
+    DATA.tasks
+      .filter(
+        x=>x.frequency==="biweekly"
+      )
+      .forEach(x=>{
+
+        items.push({
           task:x,
           period:STATE.periods.biweekly
-        }))
+        });
 
-      :[])
+      });
+  }
 
-  ];
 
   const lp=
     items
       .filter(
-        i=>al(
-          i.task.id,
-          i.period
-        )==="Louisa"
+        i=>
+          al(
+            i.task.id,
+            i.period
+          )==="Louisa"
       )
       .reduce(
-        (s,i)=>s+i.task.points,
+        (s,i)=>
+          s+i.task.points,
         0
       );
+
 
   const pp=
     items
       .filter(
-        i=>al(
-          i.task.id,
-          i.period
-        )==="Patrick"
+        i=>
+          al(
+            i.task.id,
+            i.period
+          )==="Patrick"
       )
       .reduce(
-        (s,i)=>s+i.task.points,
+        (s,i)=>
+          s+i.task.points,
         0
       );
+
 
   $("#c").innerHTML=`
 
@@ -491,20 +833,31 @@ function week(){
       ${
         items.length
 
-        ?items
-          .map(
-            i=>row(
-              i.task,
-              i.period
+          ?items
+            .map(
+              i=>
+                row(
+                  i.task,
+                  i.period
+                )
             )
-          )
-          .join("")
+            .join("")
 
-        :'<div class="empty">Keine regelmäßigen Aufgaben.</div>'
+          :`
+            <div class="empty">
+              Keine regelmäßigen Aufgaben.
+            </div>
+          `
       }
 
-    </div>`;
+    </div>
+  `;
 }
+
+
+/* =========================
+   MONATS-TASSE
+========================= */
 
 function cup(){
 
@@ -527,6 +880,7 @@ function cup(){
     ).length%2===0
       ?"Louisa"
       :"Patrick";
+
 
   $("#c").innerHTML=`
 
@@ -584,56 +938,58 @@ function cup(){
 
         ${
           rem.length
-          ?person+" zieht"
-          :"Tasse ist leer"
+            ?person+" zieht"
+            :"Tasse ist leer"
         }
 
       </button>
 
     </div>
 
+
     ${
       drawn.length
 
-      ?`
+        ?`
 
-        <div class="sectiontitle">
-          Gezogen
-        </div>
+          <div class="sectiontitle">
+            Gezogen
+          </div>
 
-        <div class="card">
+          <div class="card">
 
-          ${
-            drawn
-              .map(id=>`
+            ${
+              drawn
+                .map(id=>`
 
-                <div class="drawn">
+                  <div class="drawn">
 
-                  <strong>
-                    ${t(id).name}
-                  </strong>
+                    <strong>
+                      ${t(id).name}
+                    </strong>
 
-                  <div class="meta">
+                    <div class="meta">
 
-                    ${al(id,month)}
-                    ·
-                    ${t(id).points}
-                    Punkte
+                      ${al(id,month)}
+                      ·
+                      ${t(id).points}
+                      Punkte
+
+                    </div>
 
                   </div>
 
-                </div>
+                `)
+                .join("")
+            }
 
-              `)
-              .join("")
-          }
+          </div>
 
-        </div>
+        `
 
-      `
-
-      :""
+        :""
     }
+
 
     <div class="sectiontitle">
       Noch in der Tasse
@@ -664,8 +1020,14 @@ function cup(){
           .join("")
       }
 
-    </div>`;
+    </div>
+  `;
 }
+
+
+/* =========================
+   MONAT WECHSELN
+========================= */
 
 function shift(d){
 
@@ -677,12 +1039,12 @@ function shift(d){
 
   if(m<1){
     m=12;
-    y--
+    y--;
   }
 
   if(m>12){
     m=1;
-    y++
+    y++;
   }
 
   month=
@@ -691,13 +1053,18 @@ function shift(d){
   render();
 }
 
+
+/* =========================
+   TASSE ZIEHEN
+========================= */
+
 async function draw(){
 
   const ids=
     (DATA.months[month]||[])
-    .filter(
-      id=>!al(id,month)
-    );
+      .filter(
+        id=>!al(id,month)
+      );
 
   if(!ids.length)return;
 
@@ -712,31 +1079,42 @@ async function draw(){
 
   const drawn=
     (DATA.months[month]||[])
-    .filter(
-      id=>al(id,month)
-    ).length;
+      .filter(
+        id=>al(id,month)
+      ).length;
+
 
   await api(
     "/api/assign",
     {
       method:"POST",
       body:JSON.stringify({
+
         taskId:n,
+
         period:month,
+
         assignedTo:
           x.shared
-          ?"shared"
-          :(drawn%2===0
-            ?"Louisa"
-            :"Patrick")
+            ?"shared"
+            :(drawn%2===0
+              ?"Louisa"
+              :"Patrick")
+
       })
     }
   );
+
 
   await loadState();
 
   render();
 }
+
+
+/* =========================
+   AUFGABEN
+========================= */
 
 function tasks(){
 
@@ -764,18 +1142,18 @@ function tasks(){
 
             ${
               f==="all"
-              ?"Alle"
-              :f
+                ?"Alle"
+                :f
             }
 
           </button>
 
         `)
-
         .join("")
       }
 
     </div>
+
 
     <div class="card">
 
@@ -803,8 +1181,8 @@ function tasks(){
 
                   ${
                     x.shared
-                    ?" · gemeinsam"
-                    :""
+                      ?" · gemeinsam"
+                      :""
                   }
 
                 </div>
@@ -818,30 +1196,56 @@ function tasks(){
             </div>
 
           `)
-
           .join("")
       }
 
-    </div>`;
+    </div>
+  `;
 }
+
+
+/* =========================
+   ABHAKEN
+========================= */
 
 async function complete(id,p){
 
-  await api(
-    "/api/complete",
-    {
-      method:"POST",
-      body:JSON.stringify({
-        taskId:id,
-        period:p
-      })
-    }
-  );
+  if(!p){
+    alert(
+      "Für diese Aufgabe wurde noch kein Zeitraum festgelegt."
+    );
+    return;
+  }
 
-  await loadState();
+  try{
 
-  render();
+    await api(
+      "/api/complete",
+      {
+        method:"POST",
+        body:JSON.stringify({
+          taskId:id,
+          period:p
+        })
+      }
+    );
+
+    await loadState();
+
+    render();
+
+  }catch(e){
+
+    alert(
+      e.message
+    );
+  }
 }
+
+
+/* =========================
+   HISTORIE
+========================= */
 
 async function history(){
 
@@ -849,49 +1253,58 @@ async function history(){
     await api("/api/state");
 
   const rows=
-    s.completions
+    (s.completions||[])
       .slice()
       .reverse()
-      .map(x=>`
+      .map(x=>{
 
-        <div class="taskrow">
+        const task=
+          t(x.task_id);
 
-          <div class="taskname">
+        if(!task)return "";
 
-            ✓
-            ${t(x.task_id).name}
+        return `
 
-            <div class="meta">
+          <div class="taskrow">
 
-              ${x.completed_by}
-              ·
+            <div class="taskname">
 
-              ${
-                new Date(
-                  x.completed_at
-                ).toLocaleDateString(
-                  "de-DE"
-                )
-              }
+              ✓
+              ${task.name}
+
+              <div class="meta">
+
+                ${x.completed_by}
+                ·
+
+                ${
+                  new Date(
+                    x.completed_at
+                  ).toLocaleDateString(
+                    "de-DE"
+                  )
+                }
+
+              </div>
 
             </div>
 
+            <span class="points">
+
+              ${
+                task.shared
+                  ?"—"
+                  :task.points+" P"
+              }
+
+            </span>
+
           </div>
 
-          <span class="points">
-
-            ${
-              t(x.task_id).shared
-              ?"—"
-              :t(x.task_id).points+" P"
-            }
-
-          </span>
-
-        </div>
-
-      `)
+        `;
+      })
       .join("");
+
 
   $("#c").innerHTML=`
 
@@ -915,12 +1328,22 @@ async function history(){
     <div class="card">
 
       ${
-        rows ||
-        '<div class="empty">Noch keine erledigten Aufgaben.</div>'
+        rows||
+        `
+          <div class="empty">
+            Noch keine erledigten Aufgaben.
+          </div>
+        `
       }
 
-    </div>`;
+    </div>
+  `;
 }
+
+
+/* =========================
+   LOGOUT
+========================= */
 
 async function logout(){
 
@@ -934,6 +1357,14 @@ async function logout(){
   location.reload();
 }
 
+
+/* =========================
+   START
+========================= */
+
 boot().catch(
-  ()=>login()
+  e=>{
+    console.error(e);
+    login();
+  }
 );
