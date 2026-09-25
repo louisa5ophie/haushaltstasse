@@ -457,7 +457,7 @@ function login(){
           </div>
 
           <button class="drawbtn">
-            Anmelden
+            Und los!
           </button>
 
           <p
@@ -638,7 +638,7 @@ function render(){
       <div>
 
         <div class="eyebrow">
-          HAUSHALTS TASSE
+          HAUSHALTSTASSE
         </div>
 
         <h1>
@@ -647,7 +647,7 @@ function render(){
             tab==="week"
               ?"Diese Woche"
               :tab==="cup"
-              ?"Monats-Tasse"
+              ?"Cup"
               :tab==="tasks"
               ?"Aufgaben"
               :"Historie"
@@ -673,7 +673,7 @@ function render(){
       ${
         [
           ["week","🗓️","Diese Woche"],
-          ["cup","☕️","Monats-Tasse"],
+          ["cup","☕️","Cup"],
           ["tasks","☑️","Aufgaben"],
           ["history","🎍","Historie"]
         ]
@@ -922,10 +922,6 @@ function cup(){
 
       <div class="cup">
 
-        <div class="steam">
-          ∿ ∿
-        </div>
-
         <div class="cupshape"></div>
 
       </div>
@@ -1124,13 +1120,13 @@ function tasks(){
 
       ${
         [
-          "all",
-          "weekly",
-          "biweekly",
-          "bimonthly",
-          "quarterly",
-          "semiannual",
-          "annual"
+          "alle",
+          "wöchentlich",
+          "zweiwöchentlich",
+          "alle zwei Monate",
+          "quartalsweise",
+          "halbjährlich",
+          "jährlich"
         ]
 
         .map(f=>`
